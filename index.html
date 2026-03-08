@@ -3,47 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bắt Hoa Đón 8/3 🌸</title>
+    <title>Bắt Hoa Đón 8/3 - Glassmorphism Edition 🌸</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pacifico&family=Quicksand:wght@600&display=swap');
 
         body {
             margin: 0;
             overflow: hidden;
-            /* Ảnh nền radiant hồng mộng mơ */
-            background: radial-gradient(circle at center, #ffe6f2 0%, #ffb3c6 50%, #ff8fab 100%);
             font-family: 'Quicksand', sans-serif;
             user-select: none;
+            /* Gradient chuyển màu liên tục dải màu hồng */
+            background: linear-gradient(-45deg, #ff9a9e, #fecfef, #ffc3a0, #ffb199, #ff758c);
+            background-size: 400% 400%;
+            animation: gradientBG 10s ease infinite;
         }
 
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Style Glassmorphism cho UI Container */
         #ui-container {
             position: absolute;
-            top: 20px;
+            top: 50px;
             left: 50%;
             transform: translateX(-50%);
             text-align: center;
             pointer-events: none;
             z-index: 10;
+            /* Kính mờ */
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 8px 32px 0 rgba(255, 105, 180, 0.3);
+            border-radius: 20px;
+            padding: 20px 40px;
         }
 
         h1 {
             font-family: 'Pacifico', cursive;
-            color: #ff0054;
-            font-size: 3rem;
+            color: #fff;
+            font-size: 3.5rem;
             margin: 0;
-            text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.7);
+            text-shadow: 0 2px 10px rgba(255, 20, 147, 0.5);
+            letter-spacing: 2px;
         }
 
         #score {
-            font-size: 1.5rem;
-            color: #d81159;
-            background: rgba(255, 255, 255, 0.6);
-            padding: 10px 20px;
-            border-radius: 30px;
-            box-shadow: 0 4px 15px rgba(255, 143, 171, 0.5);
-            display: inline-block;
+            font-size: 1.8rem;
+            color: #fff;
             margin-top: 10px;
-            border: 2px solid #ffb3c6;
+            text-shadow: 0 2px 5px rgba(255, 20, 147, 0.4);
         }
 
         #loading {
@@ -52,24 +65,39 @@
             left: 50%;
             transform: translate(-50%, -50%);
             font-size: 1.5rem;
-            color: #ff0054;
+            color: #fff;
             font-weight: bold;
             z-index: 20;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            padding: 20px 30px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
         }
 
-        /* Hiệu ứng tim bay khi click trúng */
-        .floating-heart {
+        /* Hiệu ứng Particle (hạt sáng) nổ tung màu hồng */
+        .particle {
             position: absolute;
-            font-size: 2rem;
+            width: 12px;
+            height: 12px;
+            background: radial-gradient(circle, #ffffff, #ff1493);
+            border-radius: 50%;
             pointer-events: none;
-            animation: floatUp 1s ease-out forwards;
+            box-shadow: 0 0 15px #ff69b4, 0 0 30px #ff1493;
+            animation: burst 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
             z-index: 100;
         }
 
-        @keyframes floatUp {
-            0% { transform: translateY(0) scale(0.5); opacity: 1; }
-            50% { transform: translateY(-50px) scale(1.2); opacity: 0.8; }
-            100% { transform: translateY(-100px) scale(1.5); opacity: 0; }
+        @keyframes burst {
+            0% { 
+                transform: translate(0, 0) scale(1); 
+                opacity: 1; 
+            }
+            100% { 
+                /* Biến --tx và --ty sẽ được set bằng JavaScript để bay ra các hướng */
+                transform: translate(var(--tx), var(--ty)) scale(0); 
+                opacity: 0; 
+            }
         }
     </style>
     
@@ -86,66 +114,83 @@
 
     <div id="loading">Đang chuẩn bị hoa cho bạn... 🌸</div>
     <div id="ui-container">
-        <h1>Happy 8/3!</h1>
-        <div id="score">Điểm dính thính: <span id="score-val">0</span> 💖</div>
+        <h1>Happy 8/3</h1>
+        <div id="score">Score: <span id="score-val">0</span></div>
     </div>
 
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-        // 1. Setup Scene cơ bản
+        // --- HỆ THỐNG ÂM THANH (Web Audio API) ---
+        // Tạo tiếng "Ting" lấp lánh mà không cần file audio
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playCatchSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            oscillator.type = 'sine'; // Âm thanh tròn, vang như tiếng chuông/thủy tinh
+            oscillator.frequency.setValueAtTime(1046.50, audioCtx.currentTime); // Note C6
+            oscillator.frequency.exponentialRampToValueAtTime(2093.00, audioCtx.currentTime + 0.1); // Vuốt lên C7
+            
+            gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4); // Fade out nhanh
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.4);
+        }
+
+
+        // --- SETUP SCENE THREE.JS ---
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.z = 10;
+        camera.position.z = 12; // Kéo camera lùi lại xíu để có không gian rơi
 
-        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true }); // alpha: true để hiện nền CSS
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // 2. Ánh sáng (Để hoa nhìn lấp lánh và nổi khối)
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 2);
         scene.add(ambientLight);
-        const directionalLight = new THREE.DirectionalLight(0xffddf4, 2);
+        const directionalLight = new THREE.DirectionalLight(0xffddf4, 3);
         directionalLight.position.set(5, 10, 7.5);
         scene.add(directionalLight);
 
-        // 3. Biến Game
         let baseFlower = null;
         const flowers = [];
         let score = 0;
-        let fallSpeed = 0.05; // Tốc độ rơi ban đầu
-        let spawnRate = 1500; // Thời gian spawn (ms)
+        let fallSpeed = 0.05;
+        let spawnRate = 1500;
         let lastSpawnTime = 0;
 
         const scoreEl = document.getElementById('score-val');
         const loadingEl = document.getElementById('loading');
 
-        // 4. Load 3D Model
+        // LOAD MODEL
         const loader = new GLTFLoader();
         loader.load('flower_bouquet.glb', function (gltf) {
             baseFlower = gltf.scene;
             
-            // Chỉnh kích thước model cho vừa màn hình (Tùy thuộc vào scale gốc của file .glb)
-            baseFlower.scale.set(1.5, 1.5, 1.5); 
+            // ĐÃ TĂNG SCALE: Giúp hoa to đùng dễ bấm hơn (Từ 1.5 lên 4.0)
+            baseFlower.scale.set(4.0, 4.0, 4.0); 
             
-            loadingEl.style.display = 'none'; // Ẩn chữ loading
-            animate(); // Bắt đầu game
-        }, undefined, function (error) {
-            console.error('Lỗi load model:', error);
-            loadingEl.innerText = 'Ối, lỗi tải hoa rồi! (Kiểm tra lại tên file glb nhé)';
+            loadingEl.style.display = 'none';
+            animate();
         });
 
-        // 5. Hàm thả hoa
         function spawnFlower() {
             if (!baseFlower) return;
             const newFlower = baseFlower.clone();
             
-            // Random vị trí xuất hiện ở viền trên màn hình
-            const xPos = (Math.random() - 0.5) * 15; // Range X từ -7.5 đến 7.5
-            newFlower.position.set(xPos, 8, 0); // Y = 8 (rơi từ trên cao xuống)
+            const xPos = (Math.random() - 0.5) * 18; // Mở rộng không gian X
+            newFlower.position.set(xPos, 10, 0); // Bắt đầu rơi từ Y = 10
             
-            // Random góc xoay ban đầu cho tự nhiên
             newFlower.rotation.x = Math.random() * Math.PI;
             newFlower.rotation.y = Math.random() * Math.PI;
 
@@ -153,83 +198,88 @@
             flowers.push(newFlower);
         }
 
-        // 6. Xử lý click (Raycaster)
+        // --- XỬ LÝ CLICK & HIỆU ỨNG ---
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
         window.addEventListener('pointerdown', (event) => {
-            // Chuyển đổi tọa độ chuột sang chuẩn Three.js (-1 đến +1)
+            // Đảm bảo audio context được kích hoạt khi user tương tác lần đầu
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
-
-            // Kiểm tra va chạm với các hoa
             const intersects = raycaster.intersectObjects(flowers, true);
 
             if (intersects.length > 0) {
-                // Bắt trúng!
-                // Lấy ra object cha (bó hoa)
                 let clickedObject = intersects[0].object;
                 while (clickedObject.parent && clickedObject.parent.type !== "Scene") {
                     clickedObject = clickedObject.parent;
                 }
 
-                // Xóa hoa khỏi scene và mảng
                 scene.remove(clickedObject);
                 const index = flowers.indexOf(clickedObject);
                 if (index > -1) flowers.splice(index, 1);
 
-                // Tăng điểm
                 score++;
                 scoreEl.innerText = score;
 
-                // Tăng độ khó (càng ngày càng nhanh)
+                // Càng chơi càng cuốn (nhanh dần)
                 fallSpeed += 0.002;
-                if (spawnRate > 500) spawnRate -= 20;
+                if (spawnRate > 400) spawnRate -= 25;
 
-                // Tạo hiệu ứng thả tim 2D dễ thương
-                createClickEffect(event.clientX, event.clientY);
+                // Gọi âm thanh và hiệu ứng
+                playCatchSound();
+                createParticleBurst(event.clientX, event.clientY);
             }
         });
 
-        function createClickEffect(x, y) {
-            const emojis = ['💖', '✨', '🌸', '😘'];
-            const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+        // Tạo hiệu ứng hạt nổ (Particle Burst) bằng CSS
+        function createParticleBurst(x, y) {
+            const particleCount = 15; // Số lượng hạt nổ ra
             
-            const effect = document.createElement('div');
-            effect.innerText = randomEmoji;
-            effect.className = 'floating-heart';
-            effect.style.left = `${x - 15}px`;
-            effect.style.top = `${y - 15}px`;
-            
-            document.body.appendChild(effect);
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                
+                // Đặt vị trí ban đầu ngay tại con trỏ chuột
+                particle.style.left = `${x - 6}px`; // Trừ đi một nửa width/height của hạt
+                particle.style.top = `${y - 6}px`;
+                
+                // Tính toán hướng bay ngẫu nhiên 360 độ
+                const angle = Math.random() * Math.PI * 2;
+                const velocity = 50 + Math.random() * 80; // Khoảng cách bay ra (50px - 130px)
+                
+                // Truyền giá trị vào CSS Variables để @keyframes sử dụng
+                particle.style.setProperty('--tx', `${Math.cos(angle) * velocity}px`);
+                particle.style.setProperty('--ty', `${Math.sin(angle) * velocity}px`);
+                
+                document.body.appendChild(particle);
 
-            // Tự động xóa element sau khi animation kết thúc
-            setTimeout(() => {
-                effect.remove();
-            }, 1000);
+                // Tự dọn dẹp rác DOM sau khi animation kết thúc
+                setTimeout(() => {
+                    particle.remove();
+                }, 600);
+            }
         }
 
-        // 7. Vòng lặp Game
+        // VÒNG LẶP GAME
         function animate(time) {
             requestAnimationFrame(animate);
 
-            // Spawn hoa mới dựa trên thời gian
             if (time - lastSpawnTime > spawnRate) {
                 spawnFlower();
                 lastSpawnTime = time;
             }
 
-            // Làm hoa rơi và xoay mờ ám
             for (let i = flowers.length - 1; i >= 0; i--) {
                 const f = flowers[i];
-                f.position.y -= fallSpeed; // Rơi xuống
-                f.rotation.y += 0.02; // Xoay nhẹ nhàng
+                f.position.y -= fallSpeed;
+                f.rotation.y += 0.015;
                 f.rotation.x += 0.01;
 
-                // Nếu hoa rơi qua màn hình (Y < -8) thì xóa đi cho nhẹ máy
-                if (f.position.y < -8) {
+                if (f.position.y < -12) {
                     scene.remove(f);
                     flowers.splice(i, 1);
                 }
@@ -238,7 +288,6 @@
             renderer.render(scene, camera);
         }
 
-        // 8. Responsive (Resize màn hình)
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
