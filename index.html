@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bắt Hoa Đón 8/3 🌸</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pacifico&family=Quicksand:wght@600&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            /* Ảnh nền radiant hồng mộng mơ */
+            background: radial-gradient(circle at center, #ffe6f2 0%, #ffb3c6 50%, #ff8fab 100%);
+            font-family: 'Quicksand', sans-serif;
+            user-select: none;
+        }
+
+        #ui-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        h1 {
+            font-family: 'Pacifico', cursive;
+            color: #ff0054;
+            font-size: 3rem;
+            margin: 0;
+            text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.7);
+        }
+
+        #score {
+            font-size: 1.5rem;
+            color: #d81159;
+            background: rgba(255, 255, 255, 0.6);
+            padding: 10px 20px;
+            border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(255, 143, 171, 0.5);
+            display: inline-block;
+            margin-top: 10px;
+            border: 2px solid #ffb3c6;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5rem;
+            color: #ff0054;
+            font-weight: bold;
+            z-index: 20;
+        }
+
+        /* Hiệu ứng tim bay khi click trúng */
+        .floating-heart {
+            position: absolute;
+            font-size: 2rem;
+            pointer-events: none;
+            animation: floatUp 1s ease-out forwards;
+            z-index: 100;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(0.5); opacity: 1; }
+            50% { transform: translateY(-50px) scale(1.2); opacity: 0.8; }
+            100% { transform: translateY(-100px) scale(1.5); opacity: 0; }
+        }
+    </style>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="loading">Đang chuẩn bị hoa cho bạn... 🌸</div>
+    <div id="ui-container">
+        <h1>Happy 8/3!</h1>
+        <div id="score">Điểm dính thính: <span id="score-val">0</span> 💖</div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        // 1. Setup Scene cơ bản
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 10;
+
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true }); // alpha: true để hiện nền CSS
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // 2. Ánh sáng (Để hoa nhìn lấp lánh và nổi khối)
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffddf4, 2);
+        directionalLight.position.set(5, 10, 7.5);
+        scene.add(directionalLight);
+
+        // 3. Biến Game
+        let baseFlower = null;
+        const flowers = [];
+        let score = 0;
+        let fallSpeed = 0.05; // Tốc độ rơi ban đầu
+        let spawnRate = 1500; // Thời gian spawn (ms)
+        let lastSpawnTime = 0;
+
+        const scoreEl = document.getElementById('score-val');
+        const loadingEl = document.getElementById('loading');
+
+        // 4. Load 3D Model
+        const loader = new GLTFLoader();
+        loader.load('flower_bouquet.glb', function (gltf) {
+            baseFlower = gltf.scene;
+            
+            // Chỉnh kích thước model cho vừa màn hình (Tùy thuộc vào scale gốc của file .glb)
+            baseFlower.scale.set(1.5, 1.5, 1.5); 
+            
+            loadingEl.style.display = 'none'; // Ẩn chữ loading
+            animate(); // Bắt đầu game
+        }, undefined, function (error) {
+            console.error('Lỗi load model:', error);
+            loadingEl.innerText = 'Ối, lỗi tải hoa rồi! (Kiểm tra lại tên file glb nhé)';
+        });
+
+        // 5. Hàm thả hoa
+        function spawnFlower() {
+            if (!baseFlower) return;
+            const newFlower = baseFlower.clone();
+            
+            // Random vị trí xuất hiện ở viền trên màn hình
+            const xPos = (Math.random() - 0.5) * 15; // Range X từ -7.5 đến 7.5
+            newFlower.position.set(xPos, 8, 0); // Y = 8 (rơi từ trên cao xuống)
+            
+            // Random góc xoay ban đầu cho tự nhiên
+            newFlower.rotation.x = Math.random() * Math.PI;
+            newFlower.rotation.y = Math.random() * Math.PI;
+
+            scene.add(newFlower);
+            flowers.push(newFlower);
+        }
+
+        // 6. Xử lý click (Raycaster)
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        window.addEventListener('pointerdown', (event) => {
+            // Chuyển đổi tọa độ chuột sang chuẩn Three.js (-1 đến +1)
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+
+            // Kiểm tra va chạm với các hoa
+            const intersects = raycaster.intersectObjects(flowers, true);
+
+            if (intersects.length > 0) {
+                // Bắt trúng!
+                // Lấy ra object cha (bó hoa)
+                let clickedObject = intersects[0].object;
+                while (clickedObject.parent && clickedObject.parent.type !== "Scene") {
+                    clickedObject = clickedObject.parent;
+                }
+
+                // Xóa hoa khỏi scene và mảng
+                scene.remove(clickedObject);
+                const index = flowers.indexOf(clickedObject);
+                if (index > -1) flowers.splice(index, 1);
+
+                // Tăng điểm
+                score++;
+                scoreEl.innerText = score;
+
+                // Tăng độ khó (càng ngày càng nhanh)
+                fallSpeed += 0.002;
+                if (spawnRate > 500) spawnRate -= 20;
+
+                // Tạo hiệu ứng thả tim 2D dễ thương
+                createClickEffect(event.clientX, event.clientY);
+            }
+        });
+
+        function createClickEffect(x, y) {
+            const emojis = ['💖', '✨', '🌸', '😘'];
+            const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+            
+            const effect = document.createElement('div');
+            effect.innerText = randomEmoji;
+            effect.className = 'floating-heart';
+            effect.style.left = `${x - 15}px`;
+            effect.style.top = `${y - 15}px`;
+            
+            document.body.appendChild(effect);
+
+            // Tự động xóa element sau khi animation kết thúc
+            setTimeout(() => {
+                effect.remove();
+            }, 1000);
+        }
+
+        // 7. Vòng lặp Game
+        function animate(time) {
+            requestAnimationFrame(animate);
+
+            // Spawn hoa mới dựa trên thời gian
+            if (time - lastSpawnTime > spawnRate) {
+                spawnFlower();
+                lastSpawnTime = time;
+            }
+
+            // Làm hoa rơi và xoay mờ ám
+            for (let i = flowers.length - 1; i >= 0; i--) {
+                const f = flowers[i];
+                f.position.y -= fallSpeed; // Rơi xuống
+                f.rotation.y += 0.02; // Xoay nhẹ nhàng
+                f.rotation.x += 0.01;
+
+                // Nếu hoa rơi qua màn hình (Y < -8) thì xóa đi cho nhẹ máy
+                if (f.position.y < -8) {
+                    scene.remove(f);
+                    flowers.splice(i, 1);
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // 8. Responsive (Resize màn hình)
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
